@@ -1,7 +1,7 @@
 /* Service worker «Навстречу»: благодаря ему приложение можно установить
    и открывать без интернета. Меняешь файлы приложения — подними VERSION,
    чтобы у пользователей удалился старый кэш. */
-const VERSION = "2";
+const VERSION = "3";
 const CACHE = `navstrechu-${VERSION}`;
 const SHELL = [
   "./",

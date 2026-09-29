@@ -10,7 +10,9 @@
   // ---------- Данные ----------
 
   function emptyPortrait() {
-    return { must: [], nice: [], no: [], values: [], give: "", together: "" };
+    // picks — отмеченные готовые варианты для полей give и together,
+    // answered — ответы быстрого подбора: id черты → must, nice, skip или no.
+    return { must: [], nice: [], no: [], values: [], give: "", together: "", picks: {}, answered: {} };
   }
 
   function defaultState() {
@@ -20,6 +22,7 @@
       tasks: {},
       entries: [],
       answers: {},
+      picks: {}, // отмеченные варианты в «Стоит ли?»: id вопроса → список
       portrait: { partner: emptyPortrait(), friend: emptyPortrait() },
       places: {},
       customPlaces: [],
@@ -37,6 +40,7 @@
     s.seenIntro = Boolean(d.seenIntro);
     if (isObj(d.tasks)) s.tasks = d.tasks;
     if (isObj(d.answers)) s.answers = d.answers;
+    s.picks = pickLists(d.picks);
     if (isObj(d.places)) s.places = d.places;
     if (Array.isArray(d.entries)) {
       s.entries = d.entries.filter((e) => isObj(e) && typeof e.text === "string" && typeof e.date === "number");
@@ -50,9 +54,28 @@
         if (!isObj(p)) continue;
         for (const k of ["must", "nice", "no", "values"]) s.portrait[who][k] = onlyStrings(p[k]);
         for (const k of ["give", "together"]) if (typeof p[k] === "string") s.portrait[who][k] = p[k];
+        s.portrait[who].picks = pickLists(p.picks);
+        if (isObj(p.answered)) {
+          for (const [id, choice] of Object.entries(p.answered)) {
+            if (["must", "nice", "skip", "no"].includes(choice)) s.portrait[who].answered[id] = choice;
+          }
+        }
       }
     }
     return s;
+  }
+
+  function pickLists(v) {
+    const out = {};
+    if (isObj(v)) for (const [k, list] of Object.entries(v)) out[k] = onlyStrings(list);
+    return out;
+  }
+
+  function togglePick(map, key, value) {
+    const list = map[key] || (map[key] = []);
+    const i = list.indexOf(value);
+    if (i === -1) list.push(value);
+    else list.splice(i, 1);
   }
 
   let storageWorks = true;
@@ -470,21 +493,104 @@
       </div>`;
   }
 
+  // Кнопки с готовыми вариантами: отметить проще, чем придумать с нуля.
+  function optionChips(options, picked, attrs, label) {
+    return `
+      <div class="chips chips--options" role="group" aria-label="${esc(label)}">
+        ${options
+          .map(
+            (o) =>
+              `<button type="button" class="chip${o === C.notYet ? " chip--not-yet" : ""}" ${attrs} data-value="${esc(o)}" aria-pressed="${picked.includes(o)}">${esc(o)}</button>`
+          )
+          .join("")}
+      </div>`;
+  }
+
   function whyPanel() {
     return `
-      <p class="page-lead">Здесь нет правильных ответов. Всё сохраняется само. Возвращайся к вопросам раз в пару месяцев: интересно смотреть, как меняются ответы.</p>
+      <p class="page-lead">Если на вопрос нет ответа, это нормально, особенно когда опыта отношений ещё не было: многое становится понятно только в процессе. Отмечай подходящие варианты, выбирай «${esc(C.notYet)}» и возвращайся к вопросам через пару месяцев. Всё сохраняется само.</p>
       <div class="questions">
         ${C.questions
           .map(
             (q) => `
           <div class="question">
-            <label for="q-${q.id}">${esc(q.text)}</label>
-            ${q.hint ? `<p class="hint" id="q-${q.id}-hint">${esc(q.hint)}</p>` : ""}
-            <textarea id="q-${q.id}" rows="3" data-answer="${q.id}"${q.hint ? ` aria-describedby="q-${q.id}-hint"` : ""}>${esc(state.answers[q.id] || "")}</textarea>
+            <h3 class="question-text" id="q-${q.id}-title">${esc(q.text)}</h3>
+            ${q.hint ? `<p class="hint">${esc(q.hint)}</p>` : ""}
+            ${optionChips([...q.options, C.notYet], state.picks[q.id] || [], `data-action="pick-answer" data-id="${q.id}"`, q.text)}
+            <label class="sr-only" for="q-${q.id}">Свой ответ: ${esc(q.text)}</label>
+            <textarea id="q-${q.id}" rows="2" data-answer="${q.id}" placeholder="Своими словами, если хочется">${esc(state.answers[q.id] || "")}</textarea>
           </div>`
           )
           .join("")}
       </div>`;
+  }
+
+  // ---------- Быстрый подбор для портрета ----------
+
+  function quizCard(p) {
+    const bank = C.quiz[ui.who];
+    const answered = bank.filter((it) => p.answered[it.id]).length;
+    const item = bank.find((it) => !p.answered[it.id]);
+    const back = answered
+      ? `<button type="button" class="link-btn link-btn--quiet" data-action="quiz-back">Изменить предыдущий ответ</button>`
+      : "";
+
+    if (!item) {
+      return `
+        <section class="quiz" aria-labelledby="quiz-label">
+          <p class="eyebrow" id="quiz-label">Быстрый подбор · готово</p>
+          <p class="quiz-done">Все ${bank.length} ${plural(bank.length, "черта разобрана", "черты разобраны", "черт разобраны")}. Результат уже в списках ниже, лишнее можно убрать крестиком. После настоящих встреч портрет станет точнее.</p>
+          <div class="row">
+            <button type="button" class="btn btn--small" data-action="quiz-restart">Пройти заново</button>
+            ${back}
+          </div>
+        </section>`;
+    }
+
+    return `
+      <section class="quiz" aria-labelledby="quiz-label">
+        <div class="quiz-head">
+          <p class="eyebrow" id="quiz-label">Быстрый подбор</p>
+          <span class="quiz-count">${answered + 1} из ${bank.length}</span>
+        </div>
+        <div class="route-seg quiz-bar" aria-hidden="true"><span style="width:${Math.round((answered / bank.length) * 100)}%"></span></div>
+        ${
+          answered
+            ? ""
+            : `<p class="quiz-intro">Трудно придумать с нуля? Это нормально. Здесь черты появляются по одной: отвечай первое, что чувствуешь, и списки ниже заполнятся сами.</p>`
+        }
+        <p class="quiz-item" aria-live="polite">${esc(item.text)}</p>
+        <div class="quiz-choices" role="group" aria-label="Как тебе это в ${ui.who === "partner" ? "паре" : "друге"}?">
+          ${C.quizChoices
+            .map(
+              (c, i) =>
+                `<button type="button" class="btn quiz-choice quiz-choice--${c.id}" data-action="quiz" data-value="${c.id}"><span class="quiz-key" aria-hidden="true">${i + 1}</span>${esc(c.label)}</button>`
+            )
+            .join("")}
+        </div>
+        <div class="row quiz-foot">
+          ${back}
+          <span class="kbd-hint">Можно отвечать клавишами 1–4</span>
+        </div>
+      </section>`;
+  }
+
+  function answerQuiz(choice) {
+    const p = state.portrait[ui.who];
+    const item = C.quiz[ui.who].find((it) => !p.answered[it.id]);
+    if (!item) return;
+    removeFromLists(p, item.text);
+    if (choice !== "skip") p[choice].push(item.text);
+    p.answered[item.id] = choice;
+    save();
+    render();
+  }
+
+  function removeFromLists(p, text) {
+    for (const k of ["must", "nice", "no"]) {
+      const i = p[k].indexOf(text);
+      if (i !== -1) p[k].splice(i, 1);
+    }
   }
 
   function whoPanel() {
@@ -505,20 +611,17 @@
         </div>
       </div>
       <p class="page-lead">${lead}</p>
+      ${quizCard(p)}
       <div class="portrait">
         ${listBlock("must", "Обязательно", "Без чего не получится. Лучше три-пять пунктов, а не двадцать.", "Например: доброта")}
         ${listBlock("nice", "Было бы здорово", "Приятно, но не главное.", "Например: любит походы")}
         ${listBlock("no", "Точно нет", "То, с чем мириться не получится.", "Например: грубость")}
         ${partner ? valuesBlock(p) : ""}
-        ${
-          partner
-            ? ""
-            : textBlock("together", "Что мы могли бы делать вместе", "Гулять, играть, ходить в походы, обсуждать книги, созваниваться по вечерам.")
-        }
+        ${partner ? "" : textBlock("together", "Что мы могли бы делать вместе", "Отметь, что нравится, или допиши своё.")}
         ${textBlock(
           "give",
           partner ? "Что я могу дать этому человеку" : "Что я могу дать другу",
-          "Внимание, заботу, юмор, спокойствие, умение слушать? Ответ пригодится и для анкеты."
+          "Если кажется, что нечего, посмотри варианты: наверняка что-то подойдёт. Ответ пригодится и для анкеты."
         )}
         ${nudges.map((n) => `<p class="nudge">${esc(n)}</p>`).join("")}
       </div>`;
@@ -531,7 +634,7 @@
         `В списке «Обязательно» уже ${p.must.length} ${plural(p.must.length, "пункт", "пункта", "пунктов")}. Чем он длиннее, тем меньше людей в него попадёт. Может, часть перенести в «Было бы здорово»?`
       );
     }
-    if (p.must.length + p.nice.length > 0 && !p.give.trim()) {
+    if (p.must.length + p.nice.length > 0 && !p.give.trim() && !(p.picks.give || []).length) {
       out.push("Ты уже знаешь, что хочешь найти в другом человеке. Попробуй ответить и на обратный вопрос: что ты можешь дать ему.");
     }
     return out;
@@ -580,11 +683,14 @@
 
   function textBlock(key, title, hint) {
     const id = `portrait-${ui.who}-${key}`;
+    const p = state.portrait[ui.who];
     return `
       <div class="field">
-        <label class="field-title" for="${id}">${title}</label>
-        <p class="hint" id="${id}-hint">${hint}</p>
-        <textarea id="${id}" rows="3" data-portrait="${key}" aria-describedby="${id}-hint">${esc(state.portrait[ui.who][key])}</textarea>
+        <h3 class="field-title">${title}</h3>
+        <p class="hint">${hint}</p>
+        ${optionChips(C.portraitOptions[key], p.picks[key] || [], `data-action="pick-portrait" data-key="${key}"`, title)}
+        <label class="sr-only" for="${id}">Своими словами: ${title}</label>
+        <textarea id="${id}" rows="2" data-portrait="${key}" placeholder="Своими словами, если хочется">${esc(p[key])}</textarea>
       </div>`;
   }
 
@@ -981,6 +1087,36 @@
       save();
       render();
     },
+    "pick-answer"(d) {
+      togglePick(state.picks, d.id, d.value);
+      save();
+      render();
+    },
+    "pick-portrait"(d) {
+      togglePick(state.portrait[ui.who].picks, d.key, d.value);
+      save();
+      render();
+    },
+    quiz(d) {
+      answerQuiz(d.value);
+    },
+    "quiz-back"() {
+      const p = state.portrait[ui.who];
+      const ids = Object.keys(p.answered);
+      const last = ids[ids.length - 1];
+      if (!last) return;
+      const item = C.quiz[ui.who].find((it) => it.id === last);
+      delete p.answered[last];
+      if (item) removeFromLists(p, item.text);
+      save();
+      render();
+    },
+    "quiz-restart"() {
+      // Списки не трогаем: при новых ответах черты сами переедут куда нужно.
+      state.portrait[ui.who].answered = {};
+      save();
+      render();
+    },
     about() {
       openAbout();
     },
@@ -1137,8 +1273,20 @@
       // На компьютере запись удобно сохранять, не отрывая рук от клавиатуры.
       ev.preventDefault();
       addEntry();
+    } else if (/^[1-4]$/.test(ev.key) && quizKeysActive(ev)) {
+      ev.preventDefault();
+      answerQuiz(C.quizChoices[Number(ev.key) - 1].id);
     }
   });
+
+  // Клавиши 1–4 отвечают в быстром подборе, пока человек не печатает в поле.
+  function quizKeysActive(ev) {
+    if (ev.ctrlKey || ev.metaKey || ev.altKey || ui.aboutOpen) return false;
+    if (ui.tab !== "me" || ui.meSection !== "who") return false;
+    if (ev.target.closest && ev.target.closest("input, textarea, [contenteditable]")) return false;
+    const p = state.portrait[ui.who];
+    return C.quiz[ui.who].some((it) => !p.answered[it.id]);
+  }
 
   function refreshInstall() {
     document.getElementById("side-install").hidden = !installPrompt;

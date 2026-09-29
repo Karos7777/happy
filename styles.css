@@ -944,12 +944,117 @@ legend {
   border-top: 1px solid var(--line);
 }
 
-.question label {
+.question-text {
+  margin: 0;
   font-family: var(--font-display);
   font-size: 1.12rem;
   font-weight: 500;
   line-height: 1.35;
   text-wrap: balance;
+}
+
+.question textarea,
+.field textarea[data-portrait] {
+  min-height: 64px;
+}
+
+.chips--options {
+  margin-block: 2px 4px;
+}
+
+/* «Пока не знаю» — отдельный, спокойный вариант, а не ещё один ответ в ряду. */
+.chip--not-yet {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+/* ---------- Быстрый подбор ---------- */
+
+.quiz {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: var(--radius);
+  background: var(--lamp-soft);
+}
+
+.quiz .eyebrow {
+  color: var(--lamp-ink);
+}
+
+.quiz-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quiz-count {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.quiz-bar {
+  background: var(--surface);
+}
+
+.quiz-intro,
+.quiz-done {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.quiz-item {
+  margin: 6px 0 2px;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.quiz-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quiz-choice {
+  padding-inline: 10px;
+}
+
+.quiz-choice--no {
+  border-style: dashed;
+  border-color: var(--muted);
+}
+
+.quiz-key {
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--sunken);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.quiz-foot {
+  min-height: 24px;
+}
+
+@media (min-width: 560px) {
+  .quiz-choices {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .quiz-key {
+    display: grid;
+  }
 }
 
 .who-switch {

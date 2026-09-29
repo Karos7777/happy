@@ -541,6 +541,7 @@
           <p class="eyebrow" id="quiz-label">Быстрый подбор · готово</p>
           <p class="quiz-done">Все ${bank.length} ${plural(bank.length, "черта разобрана", "черты разобраны", "черт разобраны")}. Результат уже в списках ниже, лишнее можно убрать крестиком. После настоящих встреч портрет станет точнее.</p>
           <div class="row">
+            <button type="button" class="btn btn--small btn--primary" data-action="scroll-next">Что дальше</button>
             <button type="button" class="btn btn--small" data-action="quiz-restart">Пройти заново</button>
             ${back}
           </div>
@@ -624,7 +625,99 @@
           "Если кажется, что нечего, посмотри варианты: наверняка что-то подойдёт. Ответ пригодится и для анкеты."
         )}
         ${nudges.map((n) => `<p class="nudge">${esc(n)}</p>`).join("")}
-      </div>`;
+      </div>
+      ${nextStepsBlock(p)}`;
+  }
+
+  // Портрет — не адрес, а фильтр. Этот блок превращает его в следующий шаг:
+  // где искать, что видно сразу и на что смотреть при встречах.
+  function nextStepsBlock(p) {
+    if (p.must.length + p.nice.length + p.no.length < 3) return "";
+    const partner = ui.who === "partner";
+    const bank = new Map(C.quiz[ui.who].map((it) => [it.text, it]));
+
+    // Места набирают очки за черты из «Обязательно» (2) и «Было бы здорово» (1).
+    const score = new Map();
+    for (const [list, weight] of [
+      [p.must, 2],
+      [p.nice, 1],
+    ]) {
+      for (const text of list) {
+        const it = bank.get(text);
+        for (const id of (it && it.places) || []) score.set(id, (score.get(id) || 0) + weight);
+      }
+    }
+    const places = [...score.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([id]) => C.places.find((pl) => pl.id === id))
+      .filter(Boolean);
+
+    const rows = [...p.must.map((text) => ({ text, kind: "must" })), ...p.no.map((text) => ({ text, kind: "no" }))];
+    const early = rows.filter((r) => bank.has(r.text) && bank.get(r.text).seen === "profile");
+    const later = rows.filter((r) => !early.includes(r));
+    const taskId = partner ? "love-portrait" : "friends-who";
+
+    const checkRow = (r) => {
+      const it = bank.get(r.text);
+      const hint = it
+        ? it.check
+        : "Своя черта. Подумай, по каким поступкам её можно заметить, и после встречи запиши в дневник, что увидел(а).";
+      return `
+        <li class="check-row">
+          <span class="kind kind--${r.kind}">${r.kind === "must" ? "Обязательно" : "Точно нет"}</span>
+          <div class="check-row-body">
+            <p class="check-row-title">${esc(r.text)}</p>
+            <p class="hint">${esc(hint)}</p>
+          </div>
+        </li>`;
+    };
+
+    return `
+      <section class="next-steps" id="next-steps" tabindex="-1" aria-labelledby="next-steps-title">
+        <h2 class="section-title" id="next-steps-title">Что дальше</h2>
+        <p class="page-lead">Портрет — это не адрес, где живут такие люди. Это фильтр: по нему ты решаешь, с кем продолжать общение. Часть видна сразу, остальное становится понятно только на встречах.</p>
+        <div class="field">
+          <h3 class="field-title">Где искать</h3>
+          ${
+            places.length
+              ? `<p class="hint">Там чаще встречаются люди с чертами из твоего портрета. Главное — ходить регулярно.</p>
+                 <ul class="suggest">${places
+                   .map((pl) => `<li><p class="suggest-name">${esc(pl.name)}</p><p class="hint">${esc(pl.tip)}</p></li>`)
+                   .join("")}</ul>`
+              : `<p class="hint">По портрету конкретное место не подобрать. Подойдёт любое, где есть общее дело и одни и те же люди каждую неделю.</p>`
+          }
+          ${
+            partner
+              ? `<p class="hint">Параллельно можно пробовать приложения знакомств: в фильтрах укажи город и возраст, а в своей анкете честно напиши то, что для тебя принципиально. Тогда неподходящие люди отсеются сами.</p>`
+              : ""
+          }
+          <div class="row">${gotoButton({ tab: "places" }, "btn btn--small")}</div>
+        </div>
+        ${
+          early.length
+            ? `<div class="field">
+                 <h3 class="field-title">Видно сразу</h3>
+                 <p class="hint">В анкете, по фото или в первом разговоре.</p>
+                 <ul class="check-rows">${early.map(checkRow).join("")}</ul>
+               </div>`
+            : ""
+        }
+        ${
+          later.length
+            ? `<div class="field">
+                 <h3 class="field-title">Станет понятно на встречах</h3>
+                 <p class="hint">Заранее этого не узнать. Вот на что обращать внимание.</p>
+                 <ul class="check-rows">${later.map(checkRow).join("")}</ul>
+               </div>`
+            : ""
+        }
+        ${
+          state.tasks[taskId]
+            ? `<p class="hint">Шаг «Заполнить портрет» в разделе «Путь» уже отмечен.</p>`
+            : `<div class="row"><button type="button" class="btn btn--primary" data-action="done-task" data-id="${taskId}">Портрет готов, отметить шаг</button></div>`
+        }
+      </section>`;
   }
 
   function portraitNudges(p) {
@@ -1110,6 +1203,13 @@
       if (item) removeFromLists(p, item.text);
       save();
       render();
+    },
+    "scroll-next"() {
+      const el = document.getElementById("next-steps");
+      if (!el) return;
+      const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+      el.focus({ preventScroll: true });
     },
     "quiz-restart"() {
       // Списки не трогаем: при новых ответах черты сами переедут куда нужно.

@@ -1,0 +1,13 @@
+{
+  "name": "Навстречу",
+  "short_name": "Навстречу",
+  "description": "Пособие для тех, кто сейчас один: путь, дневник и портрет того, кого ищешь.",
+  "lang": "ru",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f1f3f7",
+  "theme_color": "#1a2240",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

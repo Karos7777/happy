@@ -1,13 +1,35 @@
 {
+  "id": "./",
   "name": "Навстречу",
   "short_name": "Навстречу",
-  "description": "Пособие для тех, кто сейчас один: путь, дневник и портрет того, кого ищешь.",
+  "description": "Пособие для тех, кто сейчас один: путь из пяти этапов, дневник и портрет того, кого ищешь.",
   "lang": "ru",
+  "dir": "ltr",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#f1f3f7",
   "theme_color": "#1a2240",
+  "categories": ["lifestyle", "social"],
   "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Новая запись в дневнике",
+      "short_name": "Дневник",
+      "url": "./#journal",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Где искать людей",
+      "short_name": "Места",
+      "url": "./#places",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

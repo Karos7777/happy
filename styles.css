@@ -154,8 +154,9 @@ svg .fill {
 .app {
   max-width: 640px;
   margin-inline: auto;
-  padding-inline: var(--gutter);
+  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 40px);
+  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
 }
 
 .topbar {
@@ -1191,7 +1192,7 @@ legend {
   margin-inline: auto;
 }
 
-.tabbar a {
+.tab {
   position: relative;
   display: grid;
   align-content: center;
@@ -1205,16 +1206,16 @@ legend {
   text-decoration: none;
 }
 
-.tabbar a svg {
+.tab svg {
   width: 24px;
   height: 24px;
 }
 
-.tabbar a[aria-current="page"] {
+.tab[aria-current="page"] {
   color: var(--ink);
 }
 
-.tabbar a[aria-current="page"]::before {
+.tab[aria-current="page"]::before {
   content: "";
   position: absolute;
   top: -1px;
@@ -1223,6 +1224,60 @@ legend {
   height: 3px;
   border-radius: 0 0 3px 3px;
   background: var(--lamp);
+}
+
+/* Логотип и нижние ссылки боковой панели нужны только на компьютере. */
+.side-brand,
+.side-foot {
+  display: none;
+}
+
+.side-link {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+.side-link:hover {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.side-link--accent {
+  color: var(--lamp-ink);
+  font-weight: 600;
+}
+
+.install-banner {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.install-banner p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 0.95rem;
+}
+
+.kbd-hint {
+  display: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kbd-hint {
+    display: inline;
+  }
 }
 
 .notice {
@@ -1323,6 +1378,112 @@ legend {
   .sheet {
     max-height: 88vh;
     border-radius: 20px;
+  }
+}
+
+/* ---------- Компьютер: меню слева, текст по центру ---------- */
+
+@media (min-width: 960px) {
+  :root {
+    --sidebar-w: 248px;
+  }
+
+  .app {
+    max-width: none;
+    margin: 0;
+    padding: 0 48px 72px calc(var(--sidebar-w) + 48px);
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  #notice,
+  .view {
+    max-width: 720px;
+    margin-inline: auto;
+  }
+
+  #notice {
+    padding-top: 24px;
+  }
+
+  .view {
+    gap: 40px;
+    padding-top: 48px;
+  }
+
+  .tabbar {
+    top: 0;
+    right: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    width: var(--sidebar-w);
+    padding: 24px 16px;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .side-brand {
+    display: inline-flex;
+    align-self: flex-start;
+    padding: 4px 12px;
+  }
+
+  .tabbar-inner {
+    display: grid;
+    grid-template-columns: none;
+    gap: 2px;
+    max-width: none;
+    margin: 0;
+  }
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 0.95rem;
+  }
+
+  .tab:hover {
+    background: var(--sunken);
+    color: var(--ink);
+  }
+
+  .tab[aria-current="page"] {
+    background: var(--sunken);
+  }
+
+  /* На компьютере текущий раздел отмечен огоньком справа. */
+  .tab[aria-current="page"]::before {
+    top: 50%;
+    right: 14px;
+    left: auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--lamp-soft);
+    transform: translateY(-50%);
+  }
+
+  .side-foot {
+    display: grid;
+    gap: 2px;
+    margin-top: auto;
+  }
+
+  /* Кнопка установки есть в боковой панели, поэтому отдельная плашка не нужна. */
+  .install-banner {
+    display: none;
+  }
+
+  .toast {
+    bottom: 24px;
+    left: calc(50% + var(--sidebar-w) / 2);
   }
 }
 

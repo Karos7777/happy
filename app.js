@@ -139,6 +139,7 @@
     confirmReset: false,
     importText: "",
     importStatus: "",
+    installBannerHidden: false,
   };
 
   // ---------- Помощники ----------
@@ -163,6 +164,62 @@
       return true;
     }
   })();
+
+  // ---------- Установка на устройство ----------
+
+  // Адрес опубликованного приложения: с него «Навстречу» устанавливают на телефон и компьютер.
+  const SITE_URL = "https://karos7777.github.io/happy/";
+  const INSTALL_BANNER_KEY = "navstrechu:install-banner-hidden";
+
+  const isStandalone = () =>
+    window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  const isIOS =
+    /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isMac = /mac/i.test(navigator.platform);
+
+  // Событие браузера, через которое можно показать системное окно установки.
+  // Есть только в Chrome, Edge, Яндекс Браузере и других браузерах на Chromium.
+  let installPrompt = null;
+
+  function installBannerHidden() {
+    try {
+      return localStorage.getItem(INSTALL_BANNER_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function installBanner() {
+    if (!installPrompt || ui.installBannerHidden || installBannerHidden()) return "";
+    return `
+      <section class="install-banner" aria-label="Установка">
+        <p>Установи «Навстречу» на это устройство: оно будет открываться как обычное приложение и работать без интернета.</p>
+        <div class="row">
+          <button type="button" class="btn btn--small btn--primary" data-action="install">Установить</button>
+          <button type="button" class="btn btn--small" data-action="hide-install">Не сейчас</button>
+        </div>
+      </section>`;
+  }
+
+  function installSection() {
+    let body;
+    if (isStandalone()) {
+      body = `<p>«Навстречу» уже установлено и открыто как приложение.</p>`;
+    } else if (inFrame) {
+      body = `<p>Это предпросмотр. Установить приложение на телефон или компьютер можно с его сайта: <a href="${SITE_URL}" target="_blank" rel="noopener">${SITE_URL.replace("https://", "")}</a></p>`;
+    } else if (installPrompt) {
+      body = `
+        <p>Приложение появится рядом с остальными программами и будет работать без интернета.</p>
+        <div class="row"><button type="button" class="btn btn--small btn--primary" data-action="install">Установить приложение</button></div>`;
+    } else if (isIOS) {
+      body = `<p>На iPhone и iPad открой эту страницу в Safari, нажми «Поделиться» и выбери «На экран „Домой“».</p>`;
+    } else {
+      body = `
+        <p>На Android: меню браузера → «Установить приложение» или «Добавить на главный экран».</p>
+        <p>На компьютере в Chrome, Edge или Яндекс Браузере: значок установки в адресной строке или «Установить приложение» в меню браузера.</p>`;
+    }
+    return `<div class="field"><h3 class="field-title">Установить на устройство</h3>${body}</div>`;
+  }
 
   function stageDone(stage) {
     return stage.tasks.filter((t) => state.tasks[t.id]).length;
@@ -203,6 +260,7 @@
 
     return `
       ${state.seenIntro ? "" : introBlock()}
+      ${installBanner()}
       <header class="page-head">
         <p class="eyebrow">${finished ? "Все этапы пройдены" : `Этап ${cur + 1} из ${C.stages.length}`}</p>
         <h1 class="page-title">${finished ? "Весь путь пройден" : esc(C.stages[cur].title)}</h1>
@@ -336,6 +394,7 @@
         </div>
         <div class="row">
           <button type="submit" class="btn btn--primary">Сохранить запись</button>
+          <span class="kbd-hint">или ${isMac ? "⌘" : "Ctrl"} + Enter</span>
         </div>
       </form>
       <section>
@@ -624,6 +683,7 @@
           <button type="button" class="icon-btn" data-action="close-about" aria-label="Закрыть">${ICONS.close}</button>
         </div>
         <p>«Навстречу» — пособие для тех, кто сейчас один и хочет найти друзей или пару. Его автор сам проходит этот путь, поэтому пособие будет меняться вместе с опытом.</p>
+        ${installSection()}
         <div class="field">
           <h3 class="field-title">Где хранятся записи</h3>
           <p>Только в этом браузере на этом устройстве. Они никуда не отправляются. Если очистить данные браузера, записи пропадут, поэтому иногда сохраняй копию.</p>
@@ -703,8 +763,13 @@
     <div id="notice"></div>
     <main id="view" class="view" tabindex="-1"></main>
     <nav class="tabbar" aria-label="Разделы">
+      <a class="brand side-brand" href="#path" data-nav="path">${ICONS.brand}<span>Навстречу</span></a>
       <div class="tabbar-inner">
-        ${TABS.map((t) => `<a href="#${t.id}" data-nav="${t.id}">${t.icon}<span>${t.label}</span></a>`).join("")}
+        ${TABS.map((t) => `<a class="tab" href="#${t.id}" data-nav="${t.id}">${t.icon}<span>${t.label}</span></a>`).join("")}
+      </div>
+      <div class="side-foot">
+        <button type="button" class="side-link side-link--accent" id="side-install" data-action="install" hidden>Установить приложение</button>
+        <button type="button" class="side-link" data-action="about">О приложении и данных</button>
       </div>
     </nav>
     <div id="sheet" class="sheet-backdrop" hidden></div>
@@ -739,7 +804,7 @@
 
   function render() {
     keepFocus(() => {
-      for (const a of root.querySelectorAll(".tabbar [data-nav]")) {
+      for (const a of root.querySelectorAll(".tab[data-nav]")) {
         if (a.dataset.nav === ui.tab) a.setAttribute("aria-current", "page");
         else a.removeAttribute("aria-current");
       }
@@ -760,7 +825,7 @@
     if (!el) return;
     el.innerHTML = storageWorks
       ? ""
-      : `<p class="notice">Браузер не даёт сохранять данные, поэтому записи пропадут, когда закроешь страницу. Сохрани копию через меню в правом верхнем углу.</p>`;
+      : `<p class="notice">Браузер не даёт сохранять данные, поэтому записи пропадут, когда закроешь страницу. Сохрани копию в разделе «О приложении и данных».</p>`;
   }
 
   let toastTimer = null;
@@ -948,6 +1013,27 @@
     "import-text"() {
       applyImport(ui.importText);
     },
+    async install() {
+      if (!installPrompt) return;
+      const prompt = installPrompt;
+      installPrompt = null;
+      prompt.prompt();
+      try {
+        await prompt.userChoice;
+      } catch (e) {
+        // Пользователь закрыл окно установки. Ничего делать не нужно.
+      }
+      refreshInstall();
+    },
+    "hide-install"() {
+      ui.installBannerHidden = true;
+      try {
+        localStorage.setItem(INSTALL_BANNER_KEY, "1");
+      } catch (e) {
+        // Не сохранилось: баннер просто появится снова при следующем открытии.
+      }
+      render();
+    },
     "ask-reset"() {
       ui.confirmReset = true;
       renderSheet();
@@ -1045,8 +1131,37 @@
   });
 
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape" && ui.aboutOpen) closeAbout();
+    if (ev.key === "Escape" && ui.aboutOpen) {
+      closeAbout();
+    } else if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey) && ev.target.id === "entry-text") {
+      // На компьютере запись удобно сохранять, не отрывая рук от клавиатуры.
+      ev.preventDefault();
+      addEntry();
+    }
   });
+
+  function refreshInstall() {
+    document.getElementById("side-install").hidden = !installPrompt;
+    render();
+    if (ui.aboutOpen) renderSheet();
+  }
+
+  window.addEventListener("beforeinstallprompt", (ev) => {
+    ev.preventDefault();
+    installPrompt = ev;
+    refreshInstall();
+  });
+
+  window.addEventListener("appinstalled", () => {
+    installPrompt = null;
+    refreshInstall();
+    toast("Приложение установлено");
+  });
+
+  // Работа без интернета. Во встроенном предпросмотре и при открытии файла с диска недоступна.
+  if ("serviceWorker" in navigator && !inFrame && (location.protocol === "https:" || location.hostname === "localhost")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
 
   window.addEventListener("hashchange", () => {
     const tab = tabFromHash();
